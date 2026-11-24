@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Git: the basics, and what to do when it breaks</title>
+  <!-- Course-wide Git tutorial for level-2-practice (fork of JenniferT9462/level-2-practice).
+       Step through with Next / Back or the arrow keys. Jump to a part with the buttons, or #N in the URL.
+       Parts 1–3 = how it works (the Monday routine). Parts 4–5 = trouble: each one is 2 screens,
+       "what you see" first (ask the class "what happened?"), then the fix.
+       The error texts are what Git and VS Code really print (trimmed a little). -->
+  <style>
+    :root {
+      --bg: #fffcf9;
+      --ink: #1e293b;
+      --muted: #64748b;
+      --blue: #4e89bd;
+      --red: #e06c75;
+      --green: #3f8f5a;
+      --gold: #d79b2b;
+      --purple: #8e6bbf;
+      --line: #e2dcd3;
+      --hl: #fff1cc;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      font-family: Inter, system-ui, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    h1 { margin: 18px 24px 8px; font-size: 1.55rem; text-align: center; }
+
+    .parts { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; padding: 0 24px; }
+    .parts button {
+      font: inherit; font-size: 0.88rem; font-weight: 600;
+      padding: 5px 14px; border-radius: 999px;
+      border: 2px solid var(--line); background: white; color: var(--muted); cursor: pointer;
+    }
+    .parts button.current { border-color: var(--blue); color: white; background: var(--blue); }
+    .parts button.trouble.current { border-color: var(--red); background: var(--red); }
+
+    .stage { flex: 1; max-width: 1200px; width: 100%; margin: 0 auto; padding: 14px 24px; display: flex; flex-direction: column; gap: 14px; justify-content: center; }
+
+    /* ---------- The 3 places ---------- */
+    .places { display: grid; grid-template-columns: 1fr 120px 1fr 140px 1fr; align-items: stretch; }
+    .place { border: 3px solid var(--ink); border-radius: 14px; background: white; padding: 10px 12px; transition: box-shadow 0.3s, border-color 0.3s; }
+    .place.on { border-color: var(--gold); box-shadow: 0 0 0 5px #fde9b8; }
+    .place .title { font-weight: 800; }
+    .place .tag { font-family: Consolas, monospace; font-size: 0.75rem; color: white; background: var(--muted); border-radius: 5px; padding: 1px 6px; margin-left: 4px; vertical-align: middle; }
+    .place .where { font-family: Consolas, monospace; font-size: 0.75rem; color: var(--muted); margin: 2px 0 8px; overflow-wrap: anywhere; }
+    .chips { display: flex; flex-direction: column; gap: 4px; }
+    .chip { font-size: 0.8rem; padding: 3px 8px; border-radius: 999px; background: #eef3f8; border: 2px solid #cbd9e8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background 0.3s; }
+    .chip::before { content: "● "; color: var(--blue); }
+    .chip.mine { background: #f3eefa; border-color: #d8c9ee; }
+    .chip.mine::before { color: var(--purple); }
+    .chip.merge::before { content: "◆ "; color: var(--green); }
+    .chip.hl { background: var(--hl); border-color: var(--gold); }
+    .changes { margin-top: 8px; border: 2px dashed var(--red); border-radius: 8px; padding: 4px 8px; font-size: 0.8rem; }
+    .changes b { color: var(--red); }
+
+    .link { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; font-size: 0.78rem; color: var(--muted); padding: 0 6px; gap: 4px; }
+    .link .a { width: 100%; font-weight: 700; padding: 3px 0; border-radius: 6px; transition: background 0.3s, color 0.3s; }
+    .link .a.lit { background: var(--hl); color: var(--ink); }
+    .link .a.bad { background: #fde2e4; color: var(--red); }
+
+    /* ---------- What you see / Fix ---------- */
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .row2.one { grid-template-columns: 1fr; }
+    .panel { border: 3px solid var(--ink); border-radius: 14px; background: white; overflow: hidden; }
+    .panel .bar { background: #f1ede7; padding: 5px 12px; font-weight: 700; font-size: 0.85rem; color: var(--muted); border-bottom: 2px solid var(--line); }
+    .panel .body { padding: 10px 14px; }
+    .panel pre { margin: 0; font-family: Consolas, monospace; font-size: 0.85rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .panel.term { background: #1e293b; color: #e2e8f0; border-color: #1e293b; }
+    .panel.term .bar { background: #334155; color: #cbd5e1; border-color: #334155; }
+    .panel.vim { background: #111827; color: #e5e7eb; border-color: #111827; }
+    .panel.vim .bar { background: #1f2937; color: #9ca3af; border-color: #1f2937; }
+    .panel.fix { border-color: var(--green); }
+    .panel.fix .bar { background: #e7f3ea; color: var(--green); }
+    .panel.fix ol, .panel.fix ul { margin: 0; padding-left: 22px; }
+    .panel.fix li { margin: 4px 0; }
+    .err { color: #fca5a5; }
+    .ok { color: #86efac; }
+    .dim { color: #94a3b8; }
+    .vbtn { display: inline-block; padding: 3px 12px; border-radius: 6px; background: var(--blue); color: white; font-weight: 700; font-size: 0.85rem; }
+    .gbtn { display: inline-block; padding: 3px 12px; border-radius: 6px; border: 2px solid var(--line); font-weight: 700; font-size: 0.85rem; }
+    .gbtn.danger { border-color: var(--red); color: var(--red); }
+    .conf-cur { background: #dcfce7; display: block; }
+    .conf-inc { background: #dbeafe; display: block; }
+    .conf-mark { color: var(--muted); display: block; }
+    .lens { font-size: 0.75rem; color: var(--muted); }
+
+    .caption { max-width: 1000px; margin: 0 auto 8px; padding: 0 24px; min-height: 3.2em; font-size: 1.35rem; text-align: center; }
+    code { font-family: Consolas, monospace; background: #f1ede7; padding: 1px 6px; border-radius: 4px; }
+    .panel.term code, .panel.vim code { background: #334155; }
+
+    .controls { display: flex; justify-content: center; align-items: center; gap: 16px; padding: 0 24px 22px; }
+    .controls button { padding: 10px 24px; font: inherit; font-weight: 700; border: 2px solid var(--ink); border-radius: 999px; background: white; cursor: pointer; }
+    .controls #next { background: var(--ink); color: white; }
+    .controls button:disabled { opacity: 0.35; cursor: default; }
+    .count { color: var(--muted); }
+
+    @media (max-width: 900px) {
+      .places { grid-template-columns: 1fr; }
+      .row2 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Git: the basics, and what to do when it breaks</h1>
+  <div class="parts" id="parts"></div>
+
+  <div class="stage">
+    <div class="places" id="places"></div>
+    <div class="row2" id="row2"></div>
+  </div>
+
+  <p class="caption" id="caption"></p>
+
+  <div class="controls">
+    <button id="back" type="button">← Back</button>
+    <span class="count" id="count"></span>
+    <button id="next" type="button">Next →</button>
+  </div>
+
+  <script>
+    // ---------- Commits ----------
+    // Plain string = a commit from the class repo (blue). "me:" = the student's own commit (purple).
+    // "merge:" = a merge commit (green diamond). Highlight with step.hl.
+    const W5 = "Week 5 files";
+    const MY5 = "me:Week 5 Day 5: recipe box";
+    const W6 = "Week 6 files";
+    const MY6 = "me:Week 6 Day 1: four outcomes";
+    const FIX = "Week 6: fix in script.js";
+    const MERGE = "merge:Merge branch 'main'";
+
+    const base = { up: [W5], fork: [W5, MY5], local: [W5, MY5] };
+
+    function d(extra) { return Object.assign({}, base, extra); }
+
+    // ---------- "What you see" panels ----------
+    const T = {
+      overwrite: { kind: "term", title: "Terminal (VS Code shows the same in a pop-up)", body:
+`$ git pull
+<span class="err">error: Your local changes to the following files would be overwritten by merge:
+        week-6/day-1/script.js
+Please commit your changes or stash them before you merge.
+Aborting</span>` },
+      rejectedVS: { kind: "vscode", title: "VS Code pop-up", body:
+`<span style="color: var(--red); font-weight: 700;">⊗</span> Can't push refs to remote. Try running "Pull" first to integrate your changes.` },
+      rejected: { kind: "term", title: "Terminal", body:
+`$ git push
+<span class="err"> ! [rejected]        main -> main (fetch first)
+error: failed to push some refs to 'https://github.com/you/level-2-practice.git'</span>
+<span class="dim">hint: Updates were rejected because the remote contains work that you do not
+hint: have locally. ... You may want to first integrate the remote changes
+hint: (e.g., 'git pull ...') before pushing again.</span>` },
+      divergent: { kind: "term", title: "Terminal", body:
+`$ git pull
+<span class="dim">hint: You have divergent branches and need to specify how to reconcile them.
+hint: You can do so by running one of the following commands sometime before
+hint: your next pull:
+hint:
+hint:   git config pull.rebase false  # merge
+hint:   git config pull.rebase true   # rebase
+hint:   git config pull.ff only       # fast-forward only</span>
+<span class="err">fatal: Need to specify how to reconcile divergent branches.</span>` },
+      vim: { kind: "vim", title: "Terminal, after git pull", body:
+`Merge branch 'main' of https://github.com/you/level-2-practice
+<span class="dim"># Please enter a commit message to explain why this merge is necessary,
+# especially if it merges an updated upstream into a topic branch.
+#
+# Lines starting with '#' will be ignored, and an empty message aborts
+# the commit.</span>
+<span style="color: #60a5fa;">~
+~
+~</span>
+".git/MERGE_MSG" 6L, 293B` },
+      conflict: { kind: "term", title: "Terminal + week-6/day-1/script.js in VS Code", body:
+`$ git pull
+Auto-merging week-6/day-1/script.js
+<span class="err">CONFLICT (content): Merge conflict in week-6/day-1/script.js
+Automatic merge failed; fix conflicts and then commit the result.</span>
+` },
+      conflictFile: { kind: "vscode", title: "week-6/day-1/script.js", body:
+`<span class="lens">Accept Current Change | Accept Incoming Change | Accept Both Changes</span>
+<span class="conf-mark">&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD (Current Change: yours)</span><span class="conf-cur">statusText.textContent = "Loading...";</span><span class="conf-mark">=======</span><span class="conf-inc">statusText.textContent = "Searching...";</span><span class="conf-mark">&gt;&gt;&gt;&gt;&gt;&gt;&gt; (Incoming Change: the update)</span>` },
+      syncConflict: { kind: "github", title: "github.com/you/level-2-practice · Sync fork", body:
+`<strong>This branch has conflicts that must be resolved</strong>
+<span style="color: var(--muted);">This branch is 2 commits ahead of, 1 commit behind JenniferT9462/level-2-practice:main.</span>
+
+<span class="gbtn">Open pull request</span>   <span class="gbtn danger">Discard 2 commits</span>` },
+      identity: { kind: "term", title: "Terminal (or a VS Code pop-up)", body:
+`$ git commit -m "Week 6 Day 1: four outcomes"
+<span class="err">Author identity unknown
+
+*** Please tell me who you are.</span>
+
+Run
+
+  git config --global user.email "you@example.com"
+  git config --global user.name "Your Name"
+
+<span class="err">fatal: unable to auto-detect email address</span>` },
+      notRepo: { kind: "term", title: "Terminal", body:
+`$ git status
+<span class="err">fatal: not a git repository (or any of the parent directories): .git</span>
+
+<span class="dim">VS Code Source Control says:
+"The folder currently open doesn't have a Git repository."</span>` },
+      nothing: { kind: "term", title: "Terminal", body:
+`$ git status
+On branch main
+Your branch is up to date with 'origin/main'.
+
+<span class="ok">nothing to commit, working tree clean</span>
+
+<span class="dim">...but you KNOW you changed script.js. In VS Code, the tab says:</span>  script.js ●` },
+      keyPushed: { kind: "github", title: "github.com/you/level-2-practice/week-6/day-2", body:
+`config.js
+<span style="font-family: Consolas, monospace; color: var(--red);">const GEMINI_KEY = "AIzaSyDEMO-not-a-real-key-000";</span>
+
+<span style="color: var(--muted);">(It's public. Bots search GitHub for keys all day.)</span>` }
+    };
+
+    // ---------- Steps ----------
+    // part: which part button. d: the 3 places (up / fork / local commits, changes, on, lit, bad, hl).
+    // see: what-you-see panels. fix: the fix (HTML). text: the caption.
+    const steps = [
+      // ===== 1. The big picture =====
+      { part: 0, d: d({}),
+        text: "Git keeps <strong>save points</strong> of your folder, called <strong>commits</strong>. Your practice folder lives in <strong>3 places</strong>." },
+      { part: 0, d: d({ on: ["up"] }),
+        text: "<strong>The class repo</strong> (Git calls it <code>upstream</code>): mine. I add each week's files here. You can't change it." },
+      { part: 0, d: d({ on: ["fork"] }),
+        text: "<strong>Your fork</strong> (Git calls it <code>origin</code>): your own copy on GitHub. It has my files <strong>and your work</strong> (purple). Your TA looks here." },
+      { part: 0, d: d({ on: ["local"] }),
+        text: "<strong>Your computer</strong>: the folder open in VS Code. This is the <strong>only</strong> place you type. The other two only change when you click something." },
+
+      // ===== 2. Save, commit, push =====
+      { part: 1, d: d({ changes: ["script.js"] }),
+        see: [{ kind: "vscode", title: "VS Code · Source Control", body: "Changes\n  script.js   <strong style=\"color: var(--gold);\">M</strong>\n\n<span style=\"color: var(--muted);\">M = modified since your last commit</span>" }],
+        text: "You change <code>script.js</code> and press <strong>Ctrl+S</strong> (Mac: Cmd+S). <strong>Saved</strong> is not <strong>committed</strong>. Git just notices the change: <strong>M</strong>." },
+      { part: 1, d: d({ local: [W5, MY5, MY6], hl: [MY6], lit: ["commit"] }),
+        see: [{ kind: "vscode", title: "VS Code · Source Control", body: "Message: Week 6 Day 1: four outcomes\n\n<span class=\"vbtn\">✓ Commit</span>" }],
+        text: "Type a message, click <strong>Commit</strong>. That's a save point, on <strong>your computer only</strong>. GitHub doesn't know yet." },
+      { part: 1, d: d({ fork: [W5, MY5, MY6], local: [W5, MY5, MY6], hl: [MY6], lit: ["push"] }),
+        see: [{ kind: "vscode", title: "VS Code · Source Control", body: "<span class=\"vbtn\">Sync Changes 1 ↑</span>\n\n<span style=\"color: var(--muted);\">↑ 1 = one commit waiting to go UP to GitHub</span>" }],
+        text: "<strong>Sync Changes ↑1</strong>: click it, and your commit goes <strong>up</strong> to your fork. That's a <strong>push</strong>. Now your TA can see it." },
+
+      // ===== 3. Getting my updates =====
+      { part: 2, d: d({ up: [W5, W6], hl: [W6], on: ["up"] }),
+        text: "Monday: I push the <strong>Week 6 files</strong> to the class repo. Your fork and your computer <strong>don't know yet</strong>." },
+      { part: 2, d: d({ up: [W5, W6], fork: [W5, MY5, W6], hl: [W6], lit: ["syncfork"] }),
+        see: [{ kind: "github", title: "github.com/you/level-2-practice", body: "This branch is 1 commit behind JenniferT9462/level-2-practice:main.\n\n<span class=\"gbtn\">⟳ Sync fork</span>  →  <span class=\"vbtn\">Update branch</span>" }],
+        text: "On <strong>your fork</strong> on GitHub: <strong>Sync fork</strong> → <strong>Update branch</strong>. Now your fork has the Week 6 files." },
+      { part: 2, d: d({ up: [W5, W6], fork: [W5, MY5, W6], local: [W5, MY5, W6], hl: [W6], lit: ["pull"] }),
+        see: [{ kind: "vscode", title: "VS Code · Source Control", body: "<span class=\"vbtn\">Sync Changes 1 ↓</span>\n\n<span style=\"color: var(--muted);\">↓ 1 = one commit waiting to come DOWN</span>" }],
+        text: "In VS Code: <strong>Sync Changes ↓1</strong>. That's a <strong>pull</strong>: commits come <strong>down</strong>. The <code>week-6</code> folder appears." },
+      { part: 2, d: d({ up: [W5, W6], fork: [W5, MY5, W6], local: [W5, MY5, W6] }),
+        fix: "<ol><li><strong>Commit</strong> your work (save points first!)</li><li><strong>Sync fork</strong> on GitHub → Update branch</li><li><strong>Sync</strong> in VS Code</li></ol>",
+        fixTitle: "The Monday routine",
+        text: "That's the whole routine. <strong>Almost every pull error comes from skipping step 1.</strong>" },
+
+      // ===== 4. Trouble: pull and push errors =====
+      { part: 3, d: d({ up: [W5, W6], fork: [W5, MY5, W6], changes: ["week-6/day-1/script.js"], bad: ["pull"] }),
+        see: [T.overwrite],
+        text: "<strong>\"Your local changes would be overwritten.\"</strong> What happened? <span style=\"color: var(--muted);\">(Ask the class.)</span>" },
+      { part: 3, d: d({ up: [W5, W6], fork: [W5, MY5, W6, MY6, MERGE], local: [W5, MY5, MY6, W6, MERGE], hl: [MY6, MERGE], lit: ["pull", "push"] }),
+        see: [T.overwrite],
+        fix: "<ol><li><strong>Commit</strong> your changes. Any message is fine.</li><li>Click <strong>Sync</strong> again.</li></ol><p style=\"margin: 8px 0 0;\">Git can mix two <strong>commits</strong> (the green ◆ is the mix). It won't mix in work that isn't committed, so it stops instead of losing it.</p>",
+        text: "You skipped step 1: <code>script.js</code> has changes that aren't committed. Fix: <strong>commit first</strong>, then Sync." },
+
+      { part: 3, d: d({ up: [W5, W6], fork: [W5, MY5, W6], local: [W5, MY5, MY6], hl: [W6, MY6], bad: ["push"] }),
+        see: [T.rejectedVS, T.rejected],
+        text: "<strong>Push rejected.</strong> What happened? Look at your fork and your computer." },
+      { part: 3, d: d({ up: [W5, W6], fork: [W5, MY5, W6, MY6, MERGE], local: [W5, MY5, MY6, W6, MERGE], hl: [MERGE], lit: ["pull", "push"] }),
+        see: [T.rejectedVS],
+        fix: "<ul><li><strong>VS Code:</strong> click <strong>Sync</strong>, not just Push. Sync pulls first, then pushes.</li><li><strong>Terminal:</strong> <code>git pull</code>, then <code>git push</code>.</li></ul>",
+        text: "Your fork has a commit your computer doesn't (you clicked Sync fork). Git won't push until you have it too. <strong>Pull first, then push.</strong>" },
+
+      { part: 3, d: d({ up: [W5, W6], fork: [W5, MY5, W6], local: [W5, MY5, MY6], bad: ["pull"] }),
+        see: [T.divergent],
+        text: "<strong>\"Divergent branches.\"</strong> Terminal only. Same situation: both sides have a new commit. Git wants you to pick <strong>how</strong> to combine them." },
+      { part: 3, d: d({ up: [W5, W6], fork: [W5, MY5, W6, MY6, MERGE], local: [W5, MY5, MY6, W6, MERGE], hl: [MERGE], lit: ["pull", "push"] }),
+        fix: "<p style=\"margin: 0 0 6px;\">Run this <strong>once</strong>, ever:</p><code>git config --global pull.rebase false</code><p style=\"margin: 8px 0 0;\">Then <code>git pull</code> again, then <code>git push</code>. It means \"combine with a merge commit\", the same thing VS Code's Sync does.</p>",
+        text: "Tell Git once, and it never asks again." },
+
+      { part: 3, d: null, see: [T.vim],
+        text: "After <code>git pull</code>, the terminal turns into <strong>this</strong>, and typing does weird things. What is it?" },
+      { part: 3, d: null, see: [T.vim],
+        fix: "<ol><li>Press <strong>Esc</strong>.</li><li>Type <code>:wq</code> (write, quit).</li><li>Press <strong>Enter</strong>.</li></ol><p style=\"margin: 8px 0 0;\">The message is already written for you. Want VS Code to open instead next time? Run once: <code>git config --global core.editor \"code --wait\"</code></p>",
+        text: "It's not broken. It's <strong>Vim</strong>, a text editor, asking for a message for the merge commit. You just need to get out." },
+
+      { part: 3, d: d({ up: [W5, FIX], fork: [W5, MY5, FIX], local: [W5, MY5, MY6], hl: [FIX, MY6], bad: ["pull"] }),
+        see: [T.conflict, T.conflictFile],
+        text: "<strong>Merge conflict.</strong> You and the update changed <strong>the same line</strong>. Git can't guess which one wins, so it shows you both." },
+      { part: 3, d: d({ up: [W5, FIX], fork: [W5, MY5, FIX, MY6, MERGE], local: [W5, MY5, MY6, FIX, MERGE], hl: [MERGE], lit: ["pull", "push"] }),
+        see: [T.conflictFile],
+        fix: "<ol><li>Click one, above the block: <strong>Accept Current</strong> (yours), <strong>Accept Incoming</strong> (the update), or <strong>Accept Both</strong>.</li><li>Check: no <code>&lt;&lt;&lt;&lt;&lt;&lt;&lt;</code> or <code>&gt;&gt;&gt;&gt;&gt;&gt;&gt;</code> left anywhere.</li><li><strong>Save</strong>, <strong>commit</strong>, <strong>Sync</strong>.</li></ol>",
+        text: "<strong>You</strong> pick the winner. It's just text: you can also edit the lines by hand, then delete the marker lines." },
+
+      { part: 3, d: d({ up: [W5, FIX], fork: [W5, MY5, MY6], local: [W5, MY5, MY6], hl: [FIX, MY6], bad: ["syncfork"] }),
+        see: [T.syncConflict],
+        text: "On GitHub, <strong>Sync fork</strong> says <strong>conflicts</strong>, and offers <strong>Discard 2 commits</strong>. ⚠ What would Discard do?" },
+      { part: 3, d: d({ up: [W5, FIX], fork: [W5, MY5, MY6, FIX, MERGE], local: [W5, MY5, MY6, FIX, MERGE], hl: [MERGE], lit: ["push"] }),
+        see: [T.syncConflict],
+        fix: "<p style=\"margin: 0 0 6px;\"><strong>Never click Discard.</strong> It deletes <strong>your</strong> commits from your fork. Instead, pull the update straight from the class repo into VS Code. In the terminal, inside <code>level-2-practice</code>:</p><code style=\"display: inline-block; overflow-wrap: anywhere;\">git pull https://github.com/JenniferT9462/level-2-practice main</code><p style=\"margin: 8px 0 0;\">Fix the conflict like before, commit, then Sync. Your fork is back in step.</p>",
+        text: "Discard would throw away your work to make room for mine. Get the update <strong>on your computer</strong> instead, where you can fix the conflict." },
+
+      // ===== 5. Trouble: other things =====
+      { part: 4, d: null, see: [T.identity],
+        text: "<strong>\"Please tell me who you are.\"</strong> A new computer, or a new Chromebook setup. Git needs a name for every commit." },
+      { part: 4, d: null, see: [T.identity],
+        fix: "<p style=\"margin: 0 0 6px;\">Run both, once, with <strong>your</strong> name and the email on your GitHub account:</p><code>git config --global user.name \"Your Name\"</code><br><br><code>git config --global user.email \"you@example.com\"</code><p style=\"margin: 8px 0 0;\">Then commit again.</p>",
+        text: "Tell Git once. Every commit after that is signed with your name." },
+
+      { part: 4, d: null, see: [T.notRepo],
+        text: "<strong>\"Not a git repository.\"</strong> Git can't find a repo in this folder. What did they open?" },
+      { part: 4, d: null, see: [T.notRepo],
+        fix: "<ul><li><strong>Wrong folder:</strong> File → Open Folder → pick <code>level-2-practice</code> itself (not Documents, not Downloads).</li><li><strong>Terminal in the wrong place:</strong> <code>cd</code> into <code>level-2-practice</code> first.</li><li><strong>A downloaded ZIP?</strong> That copy isn't connected to Git. Clone your fork instead, and copy your files in.</li></ul>",
+        text: "Usually the wrong folder, or a ZIP download instead of a clone." },
+
+      { part: 4, d: null, see: [T.nothing],
+        text: "<strong>\"Nothing to commit\"</strong>, but you're sure you changed it. Look at the tab: <strong>●</strong>" },
+      { part: 4, d: null, see: [T.nothing],
+        fix: "<ol><li>The white dot ● on the tab = <strong>not saved</strong>. Press <strong>Ctrl+S</strong> (Mac: Cmd+S).</li><li>Now Source Control shows <strong>M</strong>. Commit.</li></ol><p style=\"margin: 8px 0 0;\">Never again: <strong>File → Auto Save</strong>.</p>",
+        text: "Git only sees what's <strong>saved to the file</strong>. Unsaved typing lives only in VS Code." },
+
+      { part: 4, d: null,
+        see: [{ kind: "vscode", title: "VS Code · Source Control", body: "Changes\n  script.js   <strong style=\"color: var(--gold);\">M</strong>     <span class=\"dim\">right-click →</span> <strong>Discard Changes</strong>" }],
+        text: "<strong>\"I broke it, and I want my last save point back.\"</strong>" },
+      { part: 4, d: null,
+        see: [{ kind: "vscode", title: "VS Code · Source Control", body: "Changes\n  script.js   <strong style=\"color: var(--gold);\">M</strong>     <span class=\"dim\">right-click →</span> <strong>Discard Changes</strong>" }],
+        fix: "<ol><li>Source Control → right-click the file → <strong>Discard Changes</strong>.</li><li>The file goes back to your <strong>last commit</strong>.</li></ol><p style=\"margin: 8px 0 0;\">⚠ Everything since that commit is <strong>gone</strong>. That's why you commit often: every commit is a place you can go back to.</p>",
+        text: "Discard Changes in VS Code takes <strong>one file</strong> back to your last commit. Only your uncommitted work is lost." },
+
+      { part: 4, d: null, see: [T.keyPushed],
+        text: "<strong>\"I pushed my key.\"</strong> Can't you just delete the file and push again?" },
+      { part: 4, d: null, see: [T.keyPushed],
+        fix: "<ol><li>Tell your instructor.</li><li>In AI Studio: <strong>delete that key</strong>, and make a new one.</li><li>Put the new key in <code>config.js</code> only. Check <code>.gitignore</code> lists it, and <code>git status</code> doesn't show it.</li></ol>",
+        text: "No: deleting the file isn't enough. <strong>Every old commit still has it.</strong> A deleted key is useless to anyone who copied it." },
+
+      { part: 4, d: null,
+        fix: "<ol><li><strong>Read the message.</strong> It usually says the fix (\"commit first\", \"pull first\").</li><li><strong>Save → Commit → Sync</strong>, in that order.</li><li>Never click <strong>Discard</strong> on GitHub.</li><li>Still stuck? Screenshot the <strong>whole</strong> message and ask.</li></ol>",
+        fixTitle: "When Git yells at you",
+        text: "Git almost never loses work. It stops and complains <strong>so that</strong> it doesn't lose work." }
+    ];
+
+    const partNames = ["1 · The big picture", "2 · Save, commit, push", "3 · Getting updates", "4 · Trouble: pull & push", "5 · Trouble: other"];
+
+    function el(id) { return document.getElementById(id); }
+    function esc(t) { return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+    partNames.forEach(function (name, n) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = name;
+      if (n >= 3) b.classList.add("trouble");
+      b.addEventListener("click", function () {
+        step = steps.findIndex(function (s) { return s.part === n; });
+        show();
+      });
+      el("parts").appendChild(b);
+    });
+
+    function chips(list, hl) {
+      return list.map(function (c) {
+        let cls = "chip";
+        let label = c;
+        if (c.startsWith("me:")) { cls += " mine"; label = c.slice(3); }
+        if (c.startsWith("merge:")) { cls += " merge"; label = c.slice(6); }
+        if (hl.indexOf(c) !== -1) cls += " hl";
+        return `<div class="${cls}" title="${esc(label)}">${esc(label)}</div>`;
+      }).join("");
+    }
+
+    function arrow(key, label, s) {
+      let cls = "a";
+      if ((s.lit || []).indexOf(key) !== -1) cls += " lit";
+      if ((s.bad || []).indexOf(key) !== -1) { cls += " bad"; label += " ✗"; }
+      return `<div class="${cls}">${label}</div>`;
+    }
+
+    function drawPlaces(s) {
+      const box = el("places");
+      if (!s) { box.style.display = "none"; return; }
+      box.style.display = "";
+      const on = s.on || [];
+      const hl = s.hl || [];
+      const changes = s.changes ? `<div class="changes"><b>Not committed:</b><br>${s.changes.map(esc).join("<br>")}</div>` : "";
+      box.innerHTML = `
+        <div class="place${on.indexOf("up") !== -1 ? " on" : ""}">
+          <div class="title">Class repo <span class="tag">upstream</span></div>
+          <div class="where">github.com/JenniferT9462/level-2-practice</div>
+          <div class="chips">${chips(s.up, hl)}</div>
+        </div>
+        <div class="link">${arrow("syncfork", "Sync fork →", s)}<div>button on GitHub</div></div>
+        <div class="place${on.indexOf("fork") !== -1 ? " on" : ""}">
+          <div class="title">Your fork <span class="tag">origin</span></div>
+          <div class="where">github.com/you/level-2-practice</div>
+          <div class="chips">${chips(s.fork, hl)}</div>
+        </div>
+        <div class="link">${arrow("pull", "↓ pull →", s)}${arrow("push", "← push ↑", s)}<div>VS Code: Sync</div></div>
+        <div class="place${on.indexOf("local") !== -1 ? " on" : ""}">
+          <div class="title">Your computer</div>
+          <div class="where">VS Code · level-2-practice</div>
+          <div class="chips">${chips(s.local, hl)}</div>
+          ${(s.lit || []).indexOf("commit") !== -1 ? '<div class="link" style="padding: 6px 0 0;"><div class="a lit">+ commit</div></div>' : ""}
+          ${changes}
+        </div>`;
+    }
+
+    function panel(p) {
+      const kind = p.kind === "term" ? "term" : p.kind === "vim" ? "vim" : "";
+      return `<div class="panel ${kind}"><div class="bar">${p.title}</div><div class="body"><pre>${p.body}</pre></div></div>`;
+    }
+
+    function drawRow(s) {
+      const parts = [];
+      const see = s.see || [];
+      if (s.fix) {
+        // With a fix: show the first "what you see" panel, then the fix.
+        if (see.length) parts.push(panel(see[0]));
+        parts.push(`<div class="panel fix"><div class="bar">${s.fixTitle || "✓ The fix"}</div><div class="body">${s.fix}</div></div>`);
+      } else {
+        see.forEach(function (p) { parts.push(panel(p)); });
+      }
+      el("row2").innerHTML = parts.join("");
+      el("row2").className = parts.length === 1 ? "row2 one" : "row2";
+      el("row2").style.display = parts.length ? "" : "none";
+    }
+
+    let step = 0;
+
+    function show() {
+      const s = steps[step];
+      drawPlaces(s.d);
+      drawRow(s);
+      el("parts").querySelectorAll("button").forEach(function (b, n) {
+        b.classList.toggle("current", n === s.part);
+      });
+      el("caption").innerHTML = s.text;
+      el("count").textContent = `${step + 1} / ${steps.length}`;
+      el("back").disabled = step === 0;
+      el("next").disabled = step === steps.length - 1;
+      history.replaceState(null, "", `#${step + 1}`);
+    }
+
+    function jump() {
+      const n = parseInt(location.hash.slice(1), 10);
+      if (n >= 1 && n <= steps.length && n - 1 !== step) { step = n - 1; show(); }
+    }
+
+    el("next").addEventListener("click", function () { if (step < steps.length - 1) { step++; show(); } });
+    el("back").addEventListener("click", function () { if (step > 0) { step--; show(); } });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowRight") el("next").click();
+      if (e.key === "ArrowLeft") el("back").click();
+    });
+    window.addEventListener("hashchange", jump);
+
+    const start = parseInt(location.hash.slice(1), 10);
+    if (start >= 1 && start <= steps.length) step = start - 1;
+    show();
+  </script>
+</body>
+</html>
